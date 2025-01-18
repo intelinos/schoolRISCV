@@ -101,6 +101,10 @@ module sm_testbench;
 
             { `RVF7_ANY,  `RVF3_BEQ,  `RVOP_BEQ  } : $write ("beq   $%1d, $%1d, 0x%8h (%1d)", rs1, rs2, immB, immB);
             { `RVF7_ANY,  `RVF3_BNE,  `RVOP_BNE  } : $write ("bne   $%1d, $%1d, 0x%8h (%1d)", rs1, rs2, immB, immB);
+            
+            { `RVF7_ANY,  `RVF3_PUSH,  `RVOP_PUSH  } : $write ("push $%1d", rs1);
+            { `RVF7_ANY,  `RVF3_POP,  `RVOP_POP  } : $write ("pop $%1d", rd);
+
         endcase
     end
     endtask
@@ -111,9 +115,11 @@ module sm_testbench;
 
     always @ (posedge clk)
     begin
-        $write ("%5d  pc = %2h instr = %h   a0 = %1d", 
-                  cycle, sm_top.sm_cpu.pc, sm_top.sm_cpu.instr, sm_top.sm_cpu.rf.rf[10]);
-
+        $write ("%5d  pc = %2h instr = %h   a0 = %1d  a1 = %1d a2 = %1d a3 = %1d\n", 
+                  cycle, sm_top.sm_cpu.pc, sm_top.sm_cpu.instr, sm_top.sm_cpu.rf.rf[10], sm_top.sm_cpu.rf.rf[11], sm_top.sm_cpu.rf.rf[12], sm_top.sm_cpu.rf.rf[13]);
+        $write ("      empty = %d full = %d\n", sm_top.sm_cpu.fifo1.empty, sm_top.sm_cpu.fifo1.full);
+        
+        $write ("      ");
         disasmInstr();
 
         $write("\n");
