@@ -24,7 +24,7 @@ module sr_cpu
     wire        pcSrc;
     wire        regWrite;
     wire        aluSrc;
-    wire        wdSrc;
+    wire  [1:0] wdSrc;
     wire  [2:0] aluControl;
 
     //instruction decode wires
@@ -48,6 +48,11 @@ module sr_cpu
     //program memory access
     assign imAddr = pc >> 2;
     wire [31:0] instr = imData;
+
+       //fifo
+    wire fifo_pop;
+    wire fifo_push;
+    wire [31:0] fifo_out;
 
     //instruction decode
     sr_decode id (
@@ -97,8 +102,8 @@ module sr_cpu
         .result     ( aluResult    ) 
     );
 
-    assign wd3 = wdSrc ? immU : aluResult;
-
+    assign wd3 = { wdSrc == 2'b10 } ? fifo_out : { wdSrc == 2'b01 } ? immU : aluResult;
+   
     //control
     sr_control sm_control (
         .cmdOp      ( cmdOp        ),
@@ -109,7 +114,18 @@ module sr_cpu
         .regWrite   ( regWrite     ),
         .aluSrc     ( aluSrc       ),
         .wdSrc      ( wdSrc        ),
+        .fifo_push  ( fifo_push    ),
+        .fifo_pop   ( fifo_pop     ),
         .aluControl ( aluControl   ) 
+    );
+
+    fifo fifo1(
+        .clk  ( clk       ),
+        .reset  ( rst_n     ),
+        .push ( fifo_push ),
+        .pop  ( fifo_pop  ),
+        .in   ( rd1       ),
+        .out  ( fifo_out  )
     );
 
 endmodule
@@ -166,7 +182,9 @@ module sr_control
     output           pcSrc, 
     output reg       regWrite, 
     output reg       aluSrc,
-    output reg       wdSrc,
+    output reg       fifo_push,
+    output reg       fifo_pop,
+    output reg [1:0] wdSrc,
     output reg [2:0] aluControl
 );
     reg          branch;
@@ -178,7 +196,9 @@ module sr_control
         condZero    = 1'b0;
         regWrite    = 1'b0;
         aluSrc      = 1'b0;
-        wdSrc       = 1'b0;
+        wdSrc       = 2'b00;
+        fifo_push   = 1'b0;
+        fifo_pop    = 1'b0;
         aluControl  = `ALU_ADD;
 
         casez( {cmdF7, cmdF3, cmdOp} )
@@ -189,10 +209,13 @@ module sr_control
             { `RVF7_SUB,  `RVF3_SUB,  `RVOP_SUB  } : begin regWrite = 1'b1; aluControl = `ALU_SUB;  end
 
             { `RVF7_ANY,  `RVF3_ADDI, `RVOP_ADDI } : begin regWrite = 1'b1; aluSrc = 1'b1; aluControl = `ALU_ADD; end
-            { `RVF7_ANY,  `RVF3_ANY,  `RVOP_LUI  } : begin regWrite = 1'b1; wdSrc  = 1'b1; end
+            { `RVF7_ANY,  `RVF3_ANY,  `RVOP_LUI  } : begin regWrite = 1'b1; wdSrc  = 2'b01; end
 
             { `RVF7_ANY,  `RVF3_BEQ,  `RVOP_BEQ  } : begin branch = 1'b1; condZero = 1'b1; aluControl = `ALU_SUB; end
             { `RVF7_ANY,  `RVF3_BNE,  `RVOP_BNE  } : begin branch = 1'b1; aluControl = `ALU_SUB; end
+
+            { `RVF7_ANY,  `RVF3_PUSH,  `RVOP_PUSH  } : begin fifo_pop = 1'b0; fifo_push = 1'b1; end
+            { `RVF7_ANY,  `RVF3_POP,  `RVOP_POP  } : begin fifo_push = 1'b0; fifo_pop = 1'b1; regWrite = 1'b1; wdSrc = 2'b10; end
         endcase
     end
 endmodule
